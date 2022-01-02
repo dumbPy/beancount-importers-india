@@ -1,0 +1,5 @@
+beancount
+camelot-py
+pandas
+tabula-py
+python-docx

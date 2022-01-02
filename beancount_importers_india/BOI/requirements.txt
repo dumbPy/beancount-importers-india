@@ -1,0 +1,6 @@
+beancount
+pandas
+python-docx
+loguru
+beancount
+docx2txt
