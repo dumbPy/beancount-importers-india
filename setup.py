@@ -1,4 +1,4 @@
-rom setuptools import setup, find_packages
+from setuptools import setup, find_packages
 
 with open(os.path.join(current_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
