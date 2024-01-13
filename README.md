@@ -8,6 +8,9 @@ A collection of beancount importers for indian banks
 * Install this package with ```pip3 install git+https://github.com/dumbPy/beancount-importers-india.git```
 * Also install the required apt packages (or equivalent in non-debian based os) mentioned in [apt_requirements.txt](./apt_requirements.txt)
 
+### Extracting pdf tables
+* some pdf formats work great with tabula while others work best with camelot-py
+* If you need to create a template for table extraction using excalibur-py and it's [docker image](https://hub.docker.com/r/williamjackson/excalibur)
 
 ### Future Work
 * Would love to support statements from all the banks in India.

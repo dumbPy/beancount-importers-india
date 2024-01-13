@@ -1,2 +1,2 @@
-catdoc
+catdoc # see https://apple.stackexchange.com/a/294259 for macOS
 ghostscript
