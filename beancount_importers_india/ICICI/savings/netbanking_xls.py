@@ -1,4 +1,4 @@
-from beancount.core.number import D
+from beancount.core.number import D as D_
 from beancount.ingest import importer
 from beancount.core import account
 from beancount.core import amount
@@ -15,6 +15,11 @@ import re
 import logging
 import xlrd 
 
+def D(number):
+    if isinstance(number, str):
+        return D_(number)
+    else:
+        return D_(str(number))
 
 logger = logging.getLogger(f'ICICISavingsImporter')
 
@@ -28,12 +33,12 @@ class IciciSavingImporter(importer.ImporterProtocol):
         # skip non pdf files
         if not file.name.lower().endswith('xls'): return False
         # grepping the account number from the file should return 0
-        if subprocess.call('which xls2csv', shell=True) == 0:
+        if subprocess.call('which xls2csv > /dev/null', shell=True) == 0:
             command = f'xls2csv {file.name} | grep "{self.accountNumber}" > /dev/null'
         else:
             raise Exception("No xls2csv installed. See README.md")
 
-        if not subprocess.call(command, shell=True):
+        if not subprocess.call(command, shell=True, stderr=open(os.devnull, "w")):
             return True
         return False
 
@@ -52,7 +57,7 @@ class IciciSavingImporter(importer.ImporterProtocol):
         logger.info(tab.columns)
         for index, row in tab.iterrows():
             assert D(row['Deposit Amount (INR )']) !=0 or D(row["Withdrawal Amount (INR )"]) != 0, "Both Deposit and Withdrawl Amounts are zero" 
-            trans_date = parse(row['Transaction Date']).date()
+            trans_date = parse(row['Transaction Date'], dayfirst=True).date()
             trans_desc = row['Transaction Remarks']
             # Debit Transactions are positive in the xlsx
             trans_amt  = -1*D(row["Withdrawal Amount (INR )"])
@@ -61,8 +66,8 @@ class IciciSavingImporter(importer.ImporterProtocol):
 
 
             meta = data.new_metadata(f.name, index)
-            ref = row['Transaction Remarks']
-            if isinstance(ref, str): meta["transaction_ref"] = ref.replace('\r',' ')
+            # ref = row['Transaction Remarks']
+            # if isinstance(ref, str): meta["transaction_ref"] = ref.replace('\r',' ')
 
             txn = data.Transaction(
                 meta=meta,

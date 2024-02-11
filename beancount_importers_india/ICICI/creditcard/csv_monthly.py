@@ -1,4 +1,5 @@
 from beancount.ingest.importers.csv import Importer as CSVImporter, Col
+# from beangulp.importers.csv import Col, CSVImporter #v3 migration
 from beancount.core import data
 from beancount.core import amount
 
@@ -24,7 +25,8 @@ def Importer(last4:int, account, invert_sign=True):
                         skip_lines=8,
                         dateutil_kwds={"dayfirst":True},
                         invert_sign=invert_sign, # creditcard default transactions are debit
-                        categorizer=transaction_categorizer
+                        categorizer=transaction_categorizer,
+                        matchers=[('mime', 'text/csv')]
                         # encoding='utf-8-sig'
                         )
 

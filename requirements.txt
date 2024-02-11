@@ -4,3 +4,4 @@ pandas
 tabula-py
 python-docx
 pdftotext
+python-magic

@@ -20,7 +20,7 @@ from typing import Tuple
 class SBIEmailStatementImporter(importer.ImporterProtocol):
     def __init__(self, account_number, name_in_file, password, account="Assets:INR:SBI:Saving"):
         self.account = account
-        self.account_number = account_number
+        self.account_number = str(account_number)
         self.password = password
         self.name_in_file = name_in_file
 
@@ -33,18 +33,22 @@ class SBIEmailStatementImporter(importer.ImporterProtocol):
         # grepping the account number from the file should return 0
         lines_to_check = [
                 'XXXXXXX'+self.account_number[-4:],
-                f'Welcome {self.name_in_file}'
+                f'{self.name_in_file}'
                 ]
-        return all(
+        try:
+            all(
             [
 
                 not subprocess.call(
                     f"pdf2txt.py -P {self.password} '{f.name}' | grep '{line}' > /dev/null",
-                    shell=True
+                    shell=True,
+                    stderr=open(os.devnull, "w"),
                 )
                 for line in lines_to_check
             ]
         )
+        except:
+            return False
     
     def parse_opening_balance(self, f)->data.Balance:
         result = subprocess.run(

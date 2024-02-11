@@ -1,2 +1,3 @@
 catdoc # see https://apple.stackexchange.com/a/294259 for macOS
 ghostscript
+libmagic # see https://pypi.org/project/python-magic/ on how to install libmagic
