@@ -12,12 +12,20 @@ BSE_DATA = Path(__file__).parent.absolute()/'bse.json'
 class TickerFetcher:
     
     def __init__(self):
-        if not BSE_DATA.exists() or datetime.date.today() - datetime.datetime.fromtimestamp(BSE_DATA.stat().st_mtime).date() > datetime.timedelta(days=7):
-            # download the data and create the embeddings
-            self.bse_data = get_bse_data()
-            with open(BSE_DATA, 'w') as f:
-                json.dump(self.bse_data, f)
-
+        # We refresh the data if it's older than 2 days
+        if not BSE_DATA.exists() or datetime.date.today() - datetime.datetime.fromtimestamp(BSE_DATA.stat().st_mtime).date() > datetime.timedelta(days=2):
+            # download the data
+            new_data = get_bse_data()
+            old_data = json.loads(BSE_DATA.read_text()) if BSE_DATA.exists() else []
+            assert (isinstance(new_data, list), 'BSE data being downloaded should be list of dicts where each dict contains a single company info')
+            all_entries = {e['ISIN_NUMBER']:e for e in old_data}
+            # copy over new entries to all_entries
+            # this ensures we don't lose any data incase the bse api changes or doesn't return anything
+            for e in new_data:
+                all_entries[e['ISIN_NUMBER']] = e
+            self.bse_data = list(all_entries.values())
+            # write to our local store
+            BSE_DATA.write_text(json.dumps(self.bse_data))
         else:
             # load the data
             with open(BSE_DATA, 'r') as f:
@@ -31,6 +39,7 @@ class TickerFetcher:
 
 def get_bse_data()-> list[dict]:
     """Loads the BSE data from the BSE API and returns it as a list of Dict
+    The curl command for grabbed from https://www.bseindia.com/corporates/List_Scrips.html
 
     One dict per company with the following keys
     {'FACE_VALUE': '10.00',
