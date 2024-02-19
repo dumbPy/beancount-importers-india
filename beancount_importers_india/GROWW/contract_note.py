@@ -15,7 +15,7 @@ import re
 import mimetypes
 import datetime
 from typing import Tuple
-from beancount_importers_india.utils.ticker import TickerFetcher
+from beancount_importers_india.utils.bse import BSEClient
 
 DESCRIPTION = "Security/Contractdescription"
 COST = 'Net Rateper Unit (Rs)'
@@ -54,7 +54,7 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         self.strings_to_match = strings_to_match
         self.capital_gains_account = capital_gains_account
         self.password = password
-        self.ticker_fetcher = TickerFetcher()
+        self.bse_client = BSEClient()
 
     def file_account(self, file):
         return self.wallet
@@ -114,10 +114,6 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         df = pd.concat([self.set_header(df) for df in dfs if df.shape[1]==14], ignore_index=True)
         return self.clean_df(df)
     
-    def get_ticker(self, isin_number:str)->str:
-        ticker = self.ticker_fetcher.isin_to_ticker(isin_number)
-        return ticker
-    
     def extract_equity_net_price_and_brokerage(self, dfs:list[pd.DataFrame])->tuple[Decimal, Decimal]:
         """Extract the net price from the contract note's last table and total brokerage and taxes"""
         for df in dfs:
@@ -160,11 +156,11 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         
         # Total amount of the contract note
         txn.postings.append(
-            data.Posting(self.wallet, amount.Amount(equity_net_cost, 'INR'), None, None, None, {'transaction_ref': f'Net Amount from Groww Contract Note for Equities on {date.strftime("%Y-%m-%d")}'})
+            data.Posting(self.wallet, amount.Amount(equity_net_cost, 'INR'), None, None, None, None)
         )
         # Difference between the net cost and the sum of the individual trades is the brokerage and taxes
         txn.postings.append(
-            data.Posting(self.brokerage_account, amount.Amount(brokerage, 'INR'), None, None, None, {'transaction_ref': f'Brokerage and Taxes from Groww Contract Note for Equities on {date.strftime("%Y-%m-%d")}'})
+            data.Posting(self.brokerage_account, amount.Amount(brokerage, 'INR'), None, None, None, None)
         )
         
 
@@ -174,7 +170,7 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
             quantity = D(str(g[QUANTITY].map(int).sum()))
             cost = D(str(cost)) # cost for cost basis tracking
             price = D(str(cost)) # price is used for selling
-            ticker = self.get_ticker(isin_number)
+            ticker = self.bse_client.isin_to_ticker(isin_number)+'.BO' # Add .BO to the ticker to denote BSE so that the price fetcher can fetch the price from yahoo finance
             posting = data.Posting(
                 self.holding_account,
                 amount.Amount(D(str(quantity)), ticker),
