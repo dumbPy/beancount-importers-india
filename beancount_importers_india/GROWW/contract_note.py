@@ -170,9 +170,9 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
             quantity = D(str(g[QUANTITY].map(int).sum()))
             cost = D(str(cost)) # cost for cost basis tracking
             price = D(str(cost)) # price is used for selling
-            ticker = self.bse_client.isin_to_ticker(isin_number)+'.BO' # Add .BO to the ticker to denote BSE so that the price fetcher can fetch the price from yahoo finance
+            ticker = self.bse_client.isin_to_ticker(isin_number)
             posting = data.Posting(
-                self.holding_account,
+                self.holding_account+":"+ticker,
                 amount.Amount(D(str(quantity)), ticker),
                 # Use cost while buying keep cost { } for FIFO ambiguous match while selling
                 cost=data.CostSpec(cost, None, 'INR', date, None, merge=False) if is_buy else data.CostSpec(None, None, None, None, None, None),

@@ -1,3 +1,4 @@
+import re
 from textwrap import dedent
 from pathlib import Path
 import json
@@ -29,7 +30,7 @@ class BSEClient:
             # download the data
             new_data = self._fetch_bse_data()
             old_data = json.loads(BSE_DATA.read_text()) if BSE_DATA.exists() else []
-            assert (isinstance(new_data, list), 'BSE data being downloaded should be list of dicts where each dict contains a single company info')
+            assert isinstance(new_data, list), 'BSE data being downloaded should be list of dicts where each dict contains a single company info'
             all_entries = {e['ISIN_NUMBER']:e for e in old_data}
             # copy over new entries to all_entries
             # this ensures we don't lose any data incase the bse api changes or doesn't return anything
@@ -47,9 +48,10 @@ class BSEClient:
 
     def isin_to_ticker(self, isin: str) -> str:
         assert isin in self.bse_isin_to_company, f"ISIN {isin} not found in BSE data"
-        return self.bse_isin_to_company[isin]['scrip_id']
+        return self.sanitize_ticker(self.bse_isin_to_company[isin]['scrip_id'])
     
     def ticker_to_price(self, ticker:str)->float:
+        ticker = self.unsanitize_ticker(ticker)
         assert ticker in self.ticker_to_isin
         return self.isin_to_price(self.ticker_to_isin[ticker])
     
@@ -61,7 +63,43 @@ class BSEClient:
             raise ValueError(f'Failed to Fetch price for ISIN {isin}. Status code: {resp.status_code}')
         return float(resp.json()[PRICE_KEY])
         
+    def sanitize_ticker(self, ticker:str)->str:
+        """AR&M -> AR-AND-M
+        """
+        if re.match('^\d', ticker):
+            ticker = 'N-'+ticker
+        ticker = re.sub(r'&', '-AND-', ticker)
+        return ticker
+
+    def unsanitize_ticker(self, ticker:str)->str:
+        """AR-AND-M -> AR&M
+        """
+        for company in self.bse_data:
+            if self.sanitize_ticker(company[TICKER_KEY]) == ticker:
+                return company[TICKER_KEY]
+        raise ValueError(f"Ticker {ticker} not found in BSE data")
     
+    def ticker_to_price_source(self, ticker:str)->str:
+        """ Eg. RELIANCE -> pricehist.beanprice.yahoo/RELIANCE.BO
+        """
+        for company in self.bse_data:
+            if self.sanitize_ticker(company[TICKER_KEY]) == ticker:
+                return 'pricehist.beanprice.yahoo/'+company[TICKER_KEY]+'.BO'
+        raise ValueError(f"Ticker {ticker} not found in BSE data")
+    
+    def export_commodity_declaration(self)->str:
+        """
+        2000-01-01 commodity RELIANCE
+            price: "pricehist.beanprice.yahoo/RELIANCE.BO"
+        2000-01-01 commodity TATAMOTORS
+            price: "pricehist.beanprice.yahoo/TATAMOTORS.BO"
+        ...
+        """
+        data = []
+        for company in self.bse_data:
+            data.append(f"2000-01-01 commodity {self.sanitize_ticker(company[TICKER_KEY])}\n    price: \"{self.ticker_to_price_source(self.sanitize_ticker(company[TICKER_KEY]))}\"")
+        return '\n'.join(data)
+        
     def _fetch_bse_data(self)->list[dict]:
         """Loads the BSE data from the BSE API and returns it as a list of Dict
         The curl command for grabbed from https://www.bseindia.com/corporates/List_Scrips.html
