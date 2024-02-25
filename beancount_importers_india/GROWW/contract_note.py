@@ -60,6 +60,20 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
 
     def file_account(self, file):
         return self.wallet
+
+    def file_date(self, f):
+        tables = self.extract_tables(f)
+        date = self.extract_trade_date(tables[0].df) # first table contains the trade date
+        return date
+    
+    def file_name(self, f):
+        # strip the date from the file name to support refiling the statements
+        existing_name = Path(f.name).name
+        if re.match(r'^\d{4}-\d{2}-\d{2}\..*', existing_name):
+            return existing_name[11:]
+        else:
+            return existing_name
+
     
     def identify(self, f):
         # skip non pdf files
@@ -136,11 +150,6 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         tables = camelot.read_pdf(f.name, pages='all', flavor='lattice', password=self.password, line_scale=50)
         return tables
         
-    def file_date(self, f):
-        tables = self.extract_tables(f)
-        date = self.extract_trade_date(tables[0].df) # first table contains the trade date
-        return date
-    
     def extract(self, f, existing_entries=None):
         # TODO: generate commodity directives,and check if existing directives in existing_entries before adding them
         entries = []
@@ -198,7 +207,7 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
             # book capital gains if selling
             if (not is_buy):
                 txn.postings.append(
-                    data.Posting(self.capital_gains_account, None, None, None, None, {})
+                    data.Posting(f"{self.capital_gains_account}:{ticker}", None, None, None, None, {})
                 )
             # now lets add the individual trade lots to the transaction
             for (cost, stock_trades_by_log) in trades_by_stock.groupby(COST):
