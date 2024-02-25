@@ -69,6 +69,7 @@ class BSEClient:
         if re.match('^\d', ticker):
             ticker = 'N-'+ticker
         ticker = re.sub(r'&', '-AND-', ticker)
+        ticker = re.sub(r' ', '', ticker)
         return ticker
 
     def unsanitize_ticker(self, ticker:str)->str:
@@ -84,7 +85,7 @@ class BSEClient:
         """
         for company in self.bse_data:
             if self.sanitize_ticker(company[TICKER_KEY]) == ticker:
-                return 'pricehist.beanprice.yahoo/'+company[TICKER_KEY]+'.BO'
+                return 'beancount_importers_india.sources.yahoo_quantized/'+company[TICKER_KEY]+'.BO'
         raise ValueError(f"Ticker {ticker} not found in BSE data")
     
     def export_commodity_declaration(self)->str:

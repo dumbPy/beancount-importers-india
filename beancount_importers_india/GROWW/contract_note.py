@@ -30,9 +30,9 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
     def __init__(self,
         strings_to_match:list[str],
         password,
-        wallet='Assets:Wallet:Groww',
+        wallet='Assets:Investments:Stocks:Groww:Cash',
         holding_account="Assets:Stocks:Groww",
-        brokerage_account="Expenses:Brokerage:Groww",
+        brokerage_account="Expenses:Investments:Stocks:Groww:Brokerage",
         capital_gains_account="Income:Groww:CapitalGains",
         ):
         """ Import the trades from the Groww Contract Note
@@ -55,10 +55,11 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         self.capital_gains_account = capital_gains_account
         self.password = password
         self.bse_client = BSEClient()
+        self.cache = {} # cache tables instead of re-extracting
 
     def file_account(self, file):
         return self.wallet
-
+    
     def identify(self, f):
         # skip non pdf files
         if mimetypes.guess_type(f.name)[0] != 'application/pdf': return False
@@ -128,13 +129,22 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
                 # either way, the brokerage is always positive
                 return payable, abs(payable-actual_value)
         raise ValueError(f"Could not find the table with the net amount of the equities. Total number of tables found: {len(dfs)} and tables with 4 columns {len([t for t in dfs if t.shape[1]==4])}")
-        
     
-    def extract(self, f, existing_entries=None):
-        entries = []
-        parse_amount = lambda val: float(val.replace(",","")) if isinstance(val, str) else val
+    def extract_tables(self, f):
         # line scale helps detect small lines in lattice mode. removing it messes up the table detection
         tables = camelot.read_pdf(f.name, pages='all', flavor='lattice', password=self.password, line_scale=50)
+        return tables
+        
+    def file_date(self, f):
+        tables = self.extract_tables(f)
+        date = self.extract_trade_date(tables[0].df) # first table contains the trade date
+        return date
+    
+    def extract(self, f, existing_entries=None):
+        # TODO: generate commodity directives,and check if existing directives in existing_entries before adding them
+        entries = []
+        # tables = camelot.read_pdf(f.name, pages='all', flavor='lattice', password=self.password, line_scale=50)
+        tables = self.extract_tables(f)
 
         date = self.extract_trade_date(tables[0].df) # first table contains the trade date
         equity_net_cost, brokerage = self.extract_equity_net_price_and_brokerage([t.df for t in tables]) # last table contains the net cost of the equities
@@ -154,14 +164,14 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
             postings=[],
         )
         
-        # Total amount of the contract note
-        txn.postings.append(
-            data.Posting(self.wallet, amount.Amount(equity_net_cost, 'INR'), None, None, None, None)
-        )
         # Difference between the net cost and the sum of the individual trades is the brokerage and taxes
         txn.postings.append(
             data.Posting(self.brokerage_account, amount.Amount(brokerage, 'INR'), None, None, None, None)
         )
+        txn.postings.append(
+            data.Posting(self.wallet, None, None, None, None, None)
+        )
+        entries.append(txn)
         
 
         # We group multiple trades of same cost and buy/sell type together
@@ -181,18 +191,31 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
                 flag=None,
                 meta={})
 
+            txn = data.Transaction(
+                meta=txn_meta.copy(),
+                date=date,
+                flag=flags.FLAG_OKAY,
+                payee=None,
+                narration = f'trade',
+                tags=set(['groww']),
+                links=set(),
+                postings=[],
+            )
             txn.postings.append(posting)
+            txn.postings.append(
+                data.Posting(self.wallet, amount.Amount(-1*quantity*price, 'INR'), None, None, None, None)
+            )
+            # add gains entry to selling transactions
+            if (not is_buy):
+                txn.postings.append(
+                    data.Posting(self.capital_gains_account, None, None, None, None, {})
+                )
+            entries.append(txn)
 
         
-        # Capital gains come into picture if we are selling stocks
-        if (df[BUY_OR_SELL]=='S').any():
-            txn.postings.append(
-                data.Posting(self.capital_gains_account, None, None, None, None, {})
-            )
 
         # Sanity Check
         assert (df[COST].apply(D) * df[QUANTITY].apply(D)).sum() + brokerage == -1*equity_net_cost, f"Sum of individual trades and brokerage does not match the net cost of the contract note. Sum of individual trades: {(df[COST].apply(D) * df[QUANTITY].apply(D)).sum()} Brokerage: {brokerage} Net Cost: {equity_net_cost}"
 
-        entries.append(txn)
 
         return entries
