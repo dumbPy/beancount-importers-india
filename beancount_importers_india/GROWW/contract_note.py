@@ -24,6 +24,7 @@ QUANTITY = 'Quantity'
 TRADE_NO = 'Trade no.'
 ISIN = 'ISIN' # International Securities Identification Number, We define this column to store the ISIN of the stock extracted from the description
 TRADE_DATE = 'Trade Date'
+TOTAL = 'Net Total (Before Levies) (Rs)'
 
 
 class GrowwContractNoteImporter(importer.ImporterProtocol):
@@ -175,22 +176,11 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         
 
         # We group multiple trades of same cost and buy/sell type together
-        for ((isin_number , cost, buy_or_sell), g) in df.groupby([ISIN, COST, BUY_OR_SELL]):
+        for ((isin_number , buy_or_sell), trades_by_stock) in df.groupby([ISIN, BUY_OR_SELL]):
+            # sum of all trades of the same stock
+            net_price_of_stock = D(str(trades_by_stock[TOTAL].map(Decimal).sum()))
             is_buy = buy_or_sell=='B'
-            quantity = D(str(g[QUANTITY].map(int).sum()))
-            cost = D(str(cost)) # cost for cost basis tracking
-            price = D(str(cost)) # price is used for selling
             ticker = self.bse_client.isin_to_ticker(isin_number)
-            posting = data.Posting(
-                self.holding_account+":"+ticker,
-                amount.Amount(D(str(quantity)), ticker),
-                # Use cost while buying keep cost { } for FIFO ambiguous match while selling
-                cost=data.CostSpec(cost, None, 'INR', date, None, merge=False) if is_buy else data.CostSpec(None, None, None, None, None, None),
-                # Price is used for selling.
-                price=None if is_buy else amount.Amount(price, 'INR'),
-                flag=None,
-                meta={})
-
             txn = data.Transaction(
                 meta=txn_meta.copy(),
                 date=date,
@@ -201,20 +191,44 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
                 links=set(),
                 postings=[],
             )
-            txn.postings.append(posting)
+            # Total spent on the stock
             txn.postings.append(
-                data.Posting(self.wallet, amount.Amount(-1*quantity*price, 'INR'), None, None, None, None)
+                data.Posting(self.wallet, amount.Amount(net_price_of_stock, 'INR'), None, None, None, None)
             )
-            # add gains entry to selling transactions
+            # book capital gains if selling
             if (not is_buy):
                 txn.postings.append(
                     data.Posting(self.capital_gains_account, None, None, None, None, {})
                 )
+            # now lets add the individual trade lots to the transaction
+            for (cost, stock_trades_by_log) in trades_by_stock.groupby(COST):
+
+                # sum of units of the same stock at the same cost
+                quantity = D(str(stock_trades_by_log[QUANTITY].map(int).sum()))
+                cost = D(str(cost)) # cost for cost basis tracking
+                price = D(str(cost)) # price is used for selling
+                # posting corresponding to each log at different cost.
+                # note that two lots at same price are grouped together above in quantity
+                posting = data.Posting(
+                    self.holding_account+":"+ticker,
+                    amount.Amount(D(str(quantity)), ticker),
+                    # Use cost while buying keep cost { } for FIFO ambiguous match while selling
+                    cost=data.CostSpec(cost, None, 'INR', date, None, merge=False) if is_buy else data.CostSpec(None, None, None, None, None, None),
+                    # Price is used for selling.
+                    price=None if is_buy else amount.Amount(price, 'INR'),
+                    flag=None,
+                    meta={})
+
+                txn.postings.append(posting)
+                # add gains entry to selling transactions
             entries.append(txn)
 
         
 
         # Sanity Check
+        # cost*quantity = total
+        assert (df[COST].map(D)*df[QUANTITY].map(D)).sum() == -df[TOTAL].map(D).sum(), f"Sum of individual trades does not match the total in the contract note. Sum of individual trades: {(df[COST].map(D)*df[QUANTITY].map(D)).sum()} Total: {df[TOTAL].map(D).sum()}"
+        # cost*quantity + brokerage = what we paid
         assert (df[COST].apply(D) * df[QUANTITY].apply(D)).sum() + brokerage == -1*equity_net_cost, f"Sum of individual trades and brokerage does not match the net cost of the contract note. Sum of individual trades: {(df[COST].apply(D) * df[QUANTITY].apply(D)).sum()} Brokerage: {brokerage} Net Cost: {equity_net_cost}"
 
 

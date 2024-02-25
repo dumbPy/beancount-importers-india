@@ -8,8 +8,8 @@
 ```
 2024-02-13 * "Trades from Groww Contract Note on 2024-02-13" #groww
   document: "2024-02-17.CONTRACT_NOTE_123445566.pdf"
-  Assets:Wallet:Groww              -4583.38 INR
-  Expenses:Brokerage:Groww             8.88 INR
+  Assets:Investments:Stocks:Groww:Cash              -4583.38 INR
+  Expenses:Investments:Stocks:Groww:Brokerage             8.88 INR
   Assets:Investments:Stocks:Groww         7 INDNIPPON.BO {653.50 INR, 2024-02-13}
 ```
 
@@ -25,13 +25,13 @@ Hence, if you set the FIFO booking method, selling the right stock is as simple 
 ```
 2024-02-15 * "Trades from Groww Contract Note on 2024-02-15" #groww
   document: "2024-02-19.CONTRACT_NOTE_123445567.pdf"
-  Assets:Wallet:Groww                  4895 INR
-  Expenses:Brokerage:Groww                5 INR
+  Assets:Investments:Stocks:Groww:Cash                  4895 INR
+  Expenses:Investments:Stocks:Groww:Brokerage                5 INR
   Assets:Investments:Stocks:Groww        -7 INDNIPPON.BO {} @ 700 INR
-  Income:Stocks:Capital-Gains
+  Income:Investments:Stocks:Capital-Gains
 ```
-Meaning you sold 7 units of INDNIPPON at 700 INR per share. The `{ }` means we don't provide the cost criterion for matching which lot to sell, but due to FIFO method, the oldest of the 7 shares of INDNIPPON are matched and booked as sold, and the net profits are booked to `Income:Stocks:Capital-Gains` account.
+Meaning you sold 7 units of INDNIPPON at 700 INR per share. The `{ }` means we don't provide the cost criterion for matching which lot to sell, but due to FIFO method, the oldest of the 7 shares of INDNIPPON are matched and booked as sold, and the net profits are booked to `Income:Investments:Stocks:Capital-Gains` account.
 
-I personally use the [beancount_reds_plugins/capital_gains_classifier](https://github.com/redstreet/beancount_reds_plugins/tree/main/beancount_reds_plugins/capital_gains_classifier#readme) to further differentiate the capital gains as STCG and LTCG on the fly. When you see the transactions on fava with this plugin activated, it would book the above gains under `Income:Stocks:Capital-Gains:Short` automatically.
+I personally use the [beancount_reds_plugins/capital_gains_classifier](https://github.com/redstreet/beancount_reds_plugins/tree/main/beancount_reds_plugins/capital_gains_classifier#readme) to further differentiate the capital gains as STCG and LTCG on the fly. When you see the transactions on fava with this plugin activated, it would book the above gains under `Income:Investments:Stocks:Capital-Gains:Short` automatically.
 
 
