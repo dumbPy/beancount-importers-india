@@ -91,14 +91,14 @@ class BSEClient:
     def export_commodity_declaration(self)->str:
         """
         2000-01-01 commodity RELIANCE
-            price: "pricehist.beanprice.yahoo/RELIANCE.BO"
+            price: "INR:pricehist.beanprice.yahoo/RELIANCE.BO"
         2000-01-01 commodity TATAMOTORS
-            price: "pricehist.beanprice.yahoo/TATAMOTORS.BO"
+            price: "INR:pricehist.beanprice.yahoo/TATAMOTORS.BO"
         ...
         """
-        data = []
+        data = set()
         for company in self.bse_data:
-            data.append(f"2000-01-01 commodity {self.sanitize_ticker(company[TICKER_KEY])}\n    price: \"{self.ticker_to_price_source(self.sanitize_ticker(company[TICKER_KEY]))}\"")
+            data.add(f"2000-01-01 commodity {self.sanitize_ticker(company[TICKER_KEY])}\n    price: \"INR:{self.ticker_to_price_source(self.sanitize_ticker(company[TICKER_KEY]))}\"")
         return '\n'.join(data)
         
     def _fetch_bse_data(self)->list[dict]:
