@@ -1,3 +1,4 @@
+import re
 from beancount.core.number import D as D_
 from beancount.ingest import importer
 from beancount.core import account
@@ -31,16 +32,9 @@ class IciciSavingImporter(importer.ImporterProtocol):
 
     def identify(self, file: _FileMemo):
         # skip non pdf files
-        if not file.name.lower().endswith('xls'): return False
-        # grepping the account number from the file should return 0
-        if subprocess.call('which xls2csv > /dev/null', shell=True) == 0:
-            command = f'xls2csv {file.name} | grep "{self.accountNumber}" > /dev/null'
-        else:
-            raise Exception("No xls2csv installed. See README.md")
-
-        if not subprocess.call(command, shell=True, stderr=open(os.devnull, "w")):
-            return True
-        return False
+        if not re.match(r'.*\.xlsx?$', file.name.lower()): return False
+        # grepping the account number from the file
+        return str(self.accountNumber) in pd.read_excel(file.name).to_string()
 
     def file_account(self, file:_FileMemo):
         return self.account

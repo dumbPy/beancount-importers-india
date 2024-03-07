@@ -25,8 +25,9 @@ class Importer(importer.ImporterProtocol):
         if mimetypes.guess_type(f.name)[0] != 'application/pdf': return False
         # grepping the account number from the file should return 0
         return not subprocess.call(
-        f'ps2txt {f.name} | grep -P "Account Number\\s+:\\s+0+{self.account_number}" > /dev/null',
-        shell=True
+        f'pdf2txt.py "{f.name}" | grep "{self.account_number}" > /dev/null',
+        shell=True,
+        stderr=open(os.devnull, "w"),
         )
 
     def extract(self, f, existing_entries=None):
