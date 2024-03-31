@@ -29,6 +29,12 @@ class Importer(importer.ImporterProtocol):
         shell=True,
         stderr=open(os.devnull, "w"),
         )
+    
+    def clean_description(self, desc:str):
+        desc = desc.replace("\r"," ")
+        if desc.count('-') == 2:
+            return desc.split('-')[1]
+        return desc
 
     def extract(self, f, existing_entries=None):
         entries = []
@@ -40,7 +46,7 @@ class Importer(importer.ImporterProtocol):
 
         for index, row in tab.iterrows():
             trans_date = parse(row['Txn Date']).date()
-            trans_desc = row['Description'].replace("\r"," ")
+            trans_desc = self.clean_description(row['Description'])
             is_debit = isinstance(row['Debit'], str)
             trans_amt  = -1*D(row["Debit"]) if is_debit else D(row['Credit'])
             # if not trans_amt in [1,-1]: continue

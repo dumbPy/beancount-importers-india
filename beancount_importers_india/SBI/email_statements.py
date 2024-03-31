@@ -36,7 +36,7 @@ class SBIEmailStatementImporter(importer.ImporterProtocol):
                 f'{self.name_in_file}'
                 ]
         try:
-            all(
+            return all(
             [
 
                 not subprocess.call(
