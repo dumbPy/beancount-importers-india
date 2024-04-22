@@ -60,7 +60,7 @@ class SBIEmailStatementImporter(importer.ImporterProtocol):
         date_and_balance = result.stdout.decode('utf-8')
         date, balance = date_and_balance.split()
         # since balance is as of the end of the day, we subtract a day
-        date = parse(date.strip(':')).date() - datetime.timedelta(days=1)
+        date = parse(date.strip(':'), dayfirst=True).date() - datetime.timedelta(days=1)
         return data.Balance(
             meta = data.new_metadata(f.name, 0),
             date=date,
@@ -80,7 +80,7 @@ class SBIEmailStatementImporter(importer.ImporterProtocol):
         date, balance = date_and_balance.split()
         return data.Balance(
             meta = data.new_metadata(f.name, 0),
-            date=parse(date.strip(':')).date(),
+            date=parse(date.strip(":"), dayfirst=True, fuzzy=True).date(),
             amount = amount.Amount(D(balance), 'INR'),
             account=self.account,
             tolerance=None,
@@ -103,7 +103,7 @@ class SBIEmailStatementImporter(importer.ImporterProtocol):
 
         for index, row in tab.iterrows():
             if row['Balance']=='null' or type(row['Balance']) is float and np.isnan(row['Balance']): continue
-            trans_date = parse(row['Date']).date()
+            trans_date = parse(row['Date'], dayfirst=True).date()
             trans_desc = row['Transaction Reference'].replace("\r"," ")
             is_debit = isinstance(row['Debit'], str) and row['Debit'].strip('-')
             trans_amt  = -1*D(row["Debit"]) if is_debit else D(row['Credit'])
