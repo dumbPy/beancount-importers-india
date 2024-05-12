@@ -34,7 +34,7 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
             r"(Message\s*:\s*)((\w+ {1,2})*)"
         )  # narration can have multiple words separated by max 2 spaces
         # account_regex = re.compile(r'(Debited from|Credited to) *: *(X\w*)')
-        account_regex = re.compile(r"(XXXX+\d+)")
+        account_regex = re.compile(r"(\w+XXXX+\d+)")
         reference_regex = re.compile(r"(Txn. ID\s*:\s*)(\w+)")
         transaction_status_regex = re.compile(r"(Txn. status\s*:\s*)(\w*)")
         bank_reference_regex = re.compile(r"(Bank Ref. No.\s*: \s*)(\w*)")
@@ -160,7 +160,8 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
 if __name__ == "__main__":
     from glob import glob
 
-    paths = glob("Google Drive/My Drive/Documents/Statements/*.html")
+    paths = glob("/Users/sufiyan/Library/CloudStorage/GoogleDrive-sufi1308@gmail.com/My Drive/Documents/Statements/*.html")
+    print(paths)
 
     importer = PhonePeTransactionEmailImporter(
         accounts_map_from_emails={
