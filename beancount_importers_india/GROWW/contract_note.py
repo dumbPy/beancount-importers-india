@@ -16,6 +16,9 @@ import mimetypes
 import datetime
 from typing import Tuple
 from beancount_importers_india.utils.bse import BSEClient
+from logging import getLogger
+
+logger = getLogger('GROWW_contract_note')
 
 DESCRIPTION = "Security/Contractdescription"
 COST = 'Net Rateper Unit (Rs)'
@@ -130,6 +133,13 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         df = pd.concat([self.set_header(df) for df in dfs if df.shape[1]==14], ignore_index=True)
         return self.clean_df(df)
     
+    def extract_dp_charges(self, dfs:list[pd.DataFrame])->Decimal | None:
+        for df in dfs:
+            if df.shape[1]!=6: continue
+            df = self.set_header(df)
+            if 'Transaction description' in df.columns and 'Total amount' in df.columns:
+                return D(str(df.loc[df['Transaction description'].str.contains('DP Charges')]['Total amount'].values[0]))
+    
     def extract_equity_net_price_and_brokerage(self, dfs:list[pd.DataFrame])->tuple[Decimal, Decimal]:
         """Extract the net price from the contract note's last table and total brokerage and taxes"""
         for df in dfs:
@@ -158,6 +168,7 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
 
         date = self.extract_trade_date(tables[0].df) # first table contains the trade date
         equity_net_cost, brokerage = self.extract_equity_net_price_and_brokerage([t.df for t in tables]) # last table contains the net cost of the equities
+        dp_charges = self.extract_dp_charges([t.df for t in tables])
         df = self.extract_transactions([t.df for t in tables]) # all the tables
         txn_meta = data.new_metadata(f.name, 0)
         txn_meta['document'] = Path(f.name).name
@@ -183,6 +194,25 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         )
         entries.append(txn)
         
+        if any(df[BUY_OR_SELL]=='S') and dp_charges is None:
+            logger.warning(f"DP Charges not found in the contract note that contains selling trades: {f.name}")
+            
+        if dp_charges is not None:
+            entries.append(
+                data.Transaction(
+                    meta=txn_meta.copy(),
+                    date=date,
+                    flag=flags.FLAG_OKAY,
+                    payee=None,
+                    narration = f'DP Charges',
+                    tags=set(['groww']),
+                    links=set(),
+                    postings=[
+                        data.Posting(self.wallet, amount.Amount(-dp_charges, 'INR'), None, None, None, None),
+                        data.Posting(self.brokerage_account, amount.Amount(dp_charges, 'INR'), None, None, None, None),
+                    ],
+                )
+            )
 
         # We group multiple trades of same cost and buy/sell type together
         for ((isin_number , buy_or_sell), trades_by_stock) in df.groupby([ISIN, BUY_OR_SELL]):
@@ -229,7 +259,6 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
                     meta={})
 
                 txn.postings.append(posting)
-                # add gains entry to selling transactions
             entries.append(txn)
 
         
