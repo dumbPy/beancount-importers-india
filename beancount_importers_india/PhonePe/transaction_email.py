@@ -83,7 +83,7 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
             account = self.accounts_map_from_emails.get(match[0], None)
             if account is None:
                 raise ValueError(
-                    f"Account '{match[0][1]}' not found in the accounts_map_from_emails. available accounts are {self.accounts_map_from_emails.keys()}"
+                    f"Account '{match[0]}' not found in the accounts_map_from_emails. available accounts are {self.accounts_map_from_emails.keys()}"
                 )
 
         if match := narration_regex.findall(text):
@@ -103,7 +103,6 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
         ), f"Transaction status is not success. Status: {status}"
 
         txn_meta = data.new_metadata(file.name, 0)
-        txn_meta["document"] = Path(file.name).name
 
         txn = data.Transaction(
             meta=txn_meta,
@@ -121,7 +120,8 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
                     price=None,
                     flag=None,
                     meta={
-                        "transaction_ref": bank_reference,
+                        "document": Path(file.name).name,
+                        "transaction_ref": bank_reference if bank_reference else '-',
                         "phonepe_txn_id": reference,
                     },
                 )
@@ -138,7 +138,7 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
     def file_name(self, f):
         # strip the date from the file name to support refiling the statements
         existing_name = Path(f.name).name
-        if re.match(r"^\d{4}-\d{2}-\d{2}\..*", existing_name):
+        if re.match(r"^\d{4}-\d{2}-\d{2}.*", existing_name):
             return existing_name[11:]
         else:
             return existing_name
