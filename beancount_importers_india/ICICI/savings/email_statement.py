@@ -89,12 +89,15 @@ class ICICISavingsEmailImporter(importer.ImporterProtocol):
         # skip non pdf files
         if mimetypes.guess_type(f.name)[0] != 'application/pdf': return False
         # grepping the account number from the file should return 0
-        page = pdfplumber.open(f.name, password=self.password).pages[0]
-        text = page.extract_text()
-        num_chars = len(str(self.account_number))
-        if not 'X'*(num_chars-4)+self.account_number[-4:] in text: return False
-        if not self.name_in_file in text: return False
-        return True
+        try:
+            page = pdfplumber.open(f.name, password=self.password).pages[0]
+            text = page.extract_text()
+            num_chars = len(str(self.account_number))
+            if not 'X'*(num_chars-4)+self.account_number[-4:] in text: return False
+            if not self.name_in_file in text: return False
+            return True
+        except:
+            return False
     
     def parse_opening_balance(self, f)->data.Balance:
         df = extract_transactions_from_page(f.name, self.password, 0)
