@@ -103,6 +103,7 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
         ), f"Transaction status is not success. Status: {status}"
 
         txn_meta = data.new_metadata(file.name, 0)
+        txn_meta["document"]: Path(file.name).name
 
         txn = data.Transaction(
             meta=txn_meta,
@@ -120,8 +121,7 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
                     price=None,
                     flag=None,
                     meta={
-                        "document": Path(file.name).name,
-                        "transaction_ref": bank_reference if bank_reference else '-',
+                        "phonepe_bank_ref": bank_reference if bank_reference else '-',
                         "phonepe_txn_id": reference,
                     },
                 )

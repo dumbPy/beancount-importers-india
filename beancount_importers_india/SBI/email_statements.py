@@ -111,7 +111,7 @@ class SBIEmailStatementImporter(importer.ImporterProtocol):
 
 
             meta = data.new_metadata(f.name, index)
-            posting_meta = {}
+            posting_meta = {'document': Path(f.name).name}
             ref_col = [c for c in tab.columns if re.search("Ref",c)][-1]
             ref = row[ref_col]
             if isinstance(ref, str): posting_meta["transaction_ref"] = ref.replace('\r',' ')

@@ -118,7 +118,7 @@ class CanaraSavingsEmailStatementImporter(importer.ImporterProtocol):
             # if not trans_amt in [1,-1]: continue
 
             meta = data.new_metadata(f.name, index)
-            posting_meta = {}
+            posting_meta = {'document': Path(f.name).name}
 
             txn = data.Transaction(
                 meta=meta,
