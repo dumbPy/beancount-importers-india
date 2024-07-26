@@ -38,6 +38,7 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         holding_account="Assets:Stocks:Groww",
         brokerage_account="Expenses:Investments:Stocks:Groww:Brokerage",
         capital_gains_account="Income:Groww:CapitalGains",
+        buyback_account="Assets:Savings"
         ):
         """ Import the trades from the Groww Contract Note
         Downloads the ticker data from the BSE website and uses it to map the ISIN to the ticker
@@ -47,6 +48,9 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         holding_account: The account where the stocks are held. A placeholder for your Demat account
         brokerage_account: The difference between the net cost and the sum of the individual trades is the brokerage and taxes. Usually an expense account
         capital_gains_account: The account where the capital gains are booked.
+        buyback_account: account (usually savings) where buyback amount is credited.
+            This is used to balance the contract note if it contains a single buyback transaction.
+            For multiple transactions that aren't balanced, they are marked with !Warning flag and need to be fixed manually
 
         See https://github.com/redstreet/beancount_reds_plugins/tree/main/beancount_reds_plugins/capital_gains_classifier#readme on how to use the capital gains account for tax purposes
         This importer maps the gains to the capital gains account and the above plugin then changes them to STCG and LTCG based on the duration of the holding
@@ -57,6 +61,7 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         self.brokerage_account = brokerage_account
         self.strings_to_match = strings_to_match
         self.capital_gains_account = capital_gains_account
+        self.buyback_account = buyback_account
         self.password = password
         self.bse_client = BSEClient()
         self.cache = {} # cache tables instead of re-extracting
@@ -172,14 +177,23 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
         df = self.extract_transactions([t.df for t in tables]) # all the tables
         txn_meta = data.new_metadata(f.name, 0)
         txn_meta['document'] = Path(f.name).name
-        
+
+        # Sanity Check
+        # cost*quantity = total
+        assert (df[COST].map(D)*df[QUANTITY].map(D)).sum() == -df[TOTAL].map(D).sum(), f"Sum of individual trades does not match the total in the contract note. Sum of individual trades: {(df[COST].map(D)*df[QUANTITY].map(D)).sum()} Total: {df[TOTAL].map(D).sum()}"
+
+        # Sum of individual trades and brokerage should match the net cost of the contract note.
+        # false could mean that the contract note contains buyback trades.
+        # Need to fix these manually if the contract note could contain multiple transactions of which buybacks are unmarked,
+        # else the transaction is marked as buyback and amount credited to buyback_account
+        is_balanced = (df[COST].apply(D) * df[QUANTITY].apply(D)).sum() + brokerage == -1*equity_net_cost
         
         txn = data.Transaction(
             meta=txn_meta,
             date=date,
             flag=flags.FLAG_OKAY,
             payee=None,
-            narration = f'Trades from Groww Contract Note on {date}',
+            narration = f'brokerage for {date}',
             tags=set(['groww']),
             links=set(),
             postings=[],
@@ -223,16 +237,21 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
             txn = data.Transaction(
                 meta=txn_meta.copy(),
                 date=date,
-                flag=flags.FLAG_OKAY,
+                flag=flags.FLAG_WARNING if (not is_balanced) and df.shape[0]>1 else flags.FLAG_OKAY, # if the contract contains single unbalanced trade, it is a buyback
                 payee=None,
-                narration = f'trade',
+                narration = f'{trades_by_stock[QUANTITY].map(int).sum()} {ticker} @ {trades_by_stock[COST].map(Decimal).mean()} == {net_price_of_stock}',
                 tags=set(['groww']),
                 links=set(),
                 postings=[],
             )
             # Total spent on the stock
+            if (not is_balanced and df.shape[0]==1):
+                cash_account = self.buyback_account
+                txn.tags.add('buyback')
+            else:
+                cash_account = self.wallet
             txn.postings.append(
-                data.Posting(self.wallet, amount.Amount(net_price_of_stock, 'INR'), None, None, None, None)
+                data.Posting(cash_account, amount.Amount(net_price_of_stock, 'INR'), None, None, None, None)
             )
             # book capital gains if selling
             if (not is_buy):
@@ -260,14 +279,6 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
 
                 txn.postings.append(posting)
             entries.append(txn)
-
-        
-
-        # Sanity Check
-        # cost*quantity = total
-        assert (df[COST].map(D)*df[QUANTITY].map(D)).sum() == -df[TOTAL].map(D).sum(), f"Sum of individual trades does not match the total in the contract note. Sum of individual trades: {(df[COST].map(D)*df[QUANTITY].map(D)).sum()} Total: {df[TOTAL].map(D).sum()}"
-        # cost*quantity + brokerage = what we paid
-        assert (df[COST].apply(D) * df[QUANTITY].apply(D)).sum() + brokerage == -1*equity_net_cost, f"Sum of individual trades and brokerage does not match the net cost of the contract note. Sum of individual trades: {(df[COST].apply(D) * df[QUANTITY].apply(D)).sum()} Brokerage: {brokerage} Net Cost: {equity_net_cost}"
 
 
         return entries
