@@ -14,14 +14,14 @@ def transaction_categorizer(txn, row):
 
 def Importer(last4:int, account, invert_sign=True):
     return CSVImporter({Col.DATE: 0,
-                            Col.REFERENCE_ID:1,
+                            # Col.REFERENCE_ID:1,
                             Col.NARRATION1: 2,
                             Col.AMOUNT: 5,
                             Col.DRCR:6
                             },
                         account,
                         'INR',
-                        'X{8}'+str(last4), # regex that matches inside HSBC CSV statement content
+                        'X{8}'+str(last4), # regex that matches inside ICICI CSV statement content
                         skip_lines=8,
                         dateutil_kwds={"dayfirst":True},
                         invert_sign=invert_sign, # creditcard default transactions are debit
