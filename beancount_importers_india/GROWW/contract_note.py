@@ -148,7 +148,7 @@ class GrowwContractNoteImporter(importer.ImporterProtocol):
     def extract_equity_net_price_and_brokerage(self, dfs:list[pd.DataFrame])->tuple[Decimal, Decimal]:
         """Extract the net price from the contract note's last table and total brokerage and taxes"""
         for df in dfs:
-            if df.shape[1]==4 and set(df.iloc[0]) == set(['Description','Equity','Future & Options', 'Net Total']):
+            if df.shape[1]==4 and set(df.iloc[0].str.replace('\n',' ')) == set(['Description','Equity','Future & Options', 'Net Total']):
                 df = df.T
                 df.columns = [c.replace('\n',' ').strip() for c in df.iloc[0]]
                 df = df.drop(index=[0])
