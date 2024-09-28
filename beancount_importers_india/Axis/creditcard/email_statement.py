@@ -65,9 +65,25 @@ def extract_transactions_from_page(pdf_path:str, password:str, page_number:int=0
     text_lines = [e for e in text_lines if e.y1 < header['chars'][0]['y0'] and (footer is None or e.y0 > footer['chars'][0]['y1'])]
 
     # sort so we start top to bottom and left to right
-    text_lines.sort(key=lambda x: (x.y0, -x.x0), reverse=True)
-    rows = []
+    # text_lines.sort(key=lambda x: (x.y0, -x.x0), reverse=True)
+    text_lines.sort(key=lambda x: (x.y0), reverse=True)
+    sorted_lines = []
+    temp = [] # temporary list to hold lines that are below in a single row
     for line in text_lines:
+        if not temp:
+            temp.append(line)
+            continue
+        if abs(line.y0 - temp[-1].y0) < 5:
+            temp.append(line)
+        else:
+            sorted_lines.extend(sorted(temp, key=lambda x: x.x0))
+            temp = [line]
+    if temp:
+        sorted_lines.extend(sorted(temp, key=lambda x: x.x0))
+            
+
+    rows = []
+    for line in sorted_lines:
         # date marks the beginning of a new row
         if re.search('^\d{2}[/-]\d{2}[/-]\d{4}$', line.get_text().strip()):
             rows.append({})
