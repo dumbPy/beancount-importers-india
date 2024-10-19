@@ -80,7 +80,11 @@ class PhonePeTransactionEmailImporter(importer.ImporterProtocol):
             amount = data.Amount(sign * data.D(match.groupdict()["amount"]), "INR")
 
         if match := account_regex.findall(text):
-            account = self.accounts_map_from_emails.get(match[0], None)
+            account = None
+            for candidate in match:
+                if candidate in self.accounts_map_from_emails:
+                    account = self.accounts_map_from_emails[candidate]
+                    break
             if account is None:
                 raise ValueError(
                     f"Account '{match[0]}' not found in the accounts_map_from_emails. available accounts are {self.accounts_map_from_emails.keys()}"
